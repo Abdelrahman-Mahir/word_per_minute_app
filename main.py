@@ -1,9 +1,17 @@
 from tkinter import *
-import time
 from text_class import TextScrollCombo
-import tkinter.ttk as ttk
 from random_words import WordList
+from tkinter import ttk
+from ttkthemes import ThemedTk
+import os
 
+# TODO: Add high score file saving function
+# TODO: look into highlighting and following the words
+# TODO: Remove 1 from CPM when backspace is pressed
+# TODO: Add difficulty control by controlling the lenght of the words. Probably, means editing the class file, and asking for user input
+# TODO: The high score file should keep the history of the user with the date
+# TODO: Look into themes?
+# TODO: resolve the issue of having the delete button messing up with the words counter
 # ---------------------------- CONSTANTS ------------------------------- #
 BACKGROUND_COLOR = "#B1DDC6"
 TITLE_FONT = ("Arial", 32, "bold")
@@ -22,11 +30,15 @@ def count_down():
     global duration
     if duration > 0:
         duration -= 1
-        remaining_time.config(text=f"{duration}")
+        timer_label.config(text=f"Time Remaining: {duration}")
         main_window.after(1000, count_down)
     else:
-        remaining_time.config(text="Time's Up!")
+        timer_label.config(text="Time's Up!")
         typing_area.txt.config(state="disable")
+        if correct_words_measured.get() > high_score_tracker("read"):
+            high_score_tracker("update", new_score=correct_words_measured.get())
+            high_score_label.config(text=f"User High Score: {correct_words_measured.get()}")
+            print("It's updated")
 
 
 def space_listener(event):
@@ -38,13 +50,12 @@ def space_listener(event):
         test_list = sample_text.split()
         test_list_sliced = test_list[:words_measured.get()]
         for i in range(words_measured.get() - 1, words_measured.get()):
-            # print(f"This's from Sample Text:             {test_list[i]}")
-            # print(f"This's from user input:             {text_list[i]}")
             if text_list[i] == test_list_sliced[i]:
-                print(f"They match {text_list[i]}")
+                print(f"They match {text_list[i]}") # This line is to keep track of how the code is running
                 correct_words_measured.set(correct_words_measured.get() + 1)
-                word_count.config(textvariable=correct_words_measured)
+                words_label.config(text=f"{correct_words_measured.get()}: Words / Minute")
             else:
+                # This line is to keep track of how the code is running
                 print(f"They don't match {text_list[i]} and {test_list_sliced[i]}")
 
 
@@ -53,66 +64,88 @@ def char_listener(event):
     pressed_key = event.keysym
     if len(pressed_key) == 1 and duration > 0:  # activate only when a letter is pressed, not space, shift, etc
         char_measured.set(char_measured.get() + 1)
-        char_count.config(textvariable=char_measured)
+        char_label.config(text=f"CPM: {char_measured.get()}")
+
+
+def high_score_tracker(operation, new_score=0):  # High score tracker
+    if operation == "read":
+        with open("high_score.txt", mode="a+") as file:
+            if os.path.getsize('high_score.txt') == 0:
+                initialized_score = 0
+                file.write(f"User's Highest Score: {initialized_score}")
+                return initialized_score
+            else:
+                file.seek(0)  # Move the cursor back to the Start of the line
+                data = file.readline()
+                text = data.split()
+                existing_score = int(text[-1])
+                return existing_score
+    elif operation == "update":
+        with open("high_score.txt", mode="w") as file:
+            file.write(f"User's Highest Score: {new_score}")
+            return new_score
 
 
 # ---------------------------- Variables Initialization ------------------------------- #
 words = WordList()
 sample_text = " ".join(words.generate())
-# sample_text = ("river call south girl final out do part bird develop note but water something come as science road")
 
 # ---------------------------- GUI ------------------------------- #
-main_window = Tk()
+# Window setup
+main_window = ThemedTk(theme="Adapta")
 main_window.geometry("962x601")
 main_window.title("Wordy / Minute")
-main_window.config(bg=BACKGROUND_COLOR, padx=5, pady=5)
+main_window.config(padx=5, pady=5)
 photo = PhotoImage(file='./keyboard.png')
 main_window.iconphoto(False, photo)
 
-title = Label(text="Wordy Per Minute", bg=BACKGROUND_COLOR, font=TITLE_FONT)
+# Title
+title = ttk.Label(text="Wordy Per Minute", font=TITLE_FONT)
 title.grid(row=0, column=0, padx=5, pady=5, columnspan=4)
 
-char_count = Label(text="CPM:", bg=BACKGROUND_COLOR, font=NORMAL_FONT)
-char_count.grid(row=1, column=0, padx=0)
+# High score Label and Variable
+high_score_var = IntVar()
+high_score_var.set(high_score_tracker("read"))
+high_score_label = ttk.Label(text=f"User High Score: {high_score_var.get()}", font=NORMAL_FONT)
+high_score_label.grid(row=1, column=0, padx=0)
+
+# CPM Label and Variable
 char_measured = IntVar()
 char_measured.set(0)
-char_count = Label(textvariable=char_measured, bg=BACKGROUND_COLOR, font=NORMAL_FONT)
-char_count.grid(row=1, column=1, padx=0)
+char_label = ttk.Label(text=f"CPM: {char_measured.get()}", font=NORMAL_FONT)
+char_label.grid(row=1, column=2, padx=0)
 
+# WPM Label and variable
 words_measured = IntVar()
 words_measured.set(0)
 correct_words_measured = IntVar()
 correct_words_measured.set(0)
-word_count = Label(textvariable=correct_words_measured, bg=BACKGROUND_COLOR, font=NORMAL_FONT)
-word_count.grid(row=1, column=2, padx=0)
-words_label = Label(text=": Words / Minute", bg=BACKGROUND_COLOR, font=NORMAL_FONT)
+words_label = ttk.Label(text=f"{correct_words_measured.get()} : Words / Minute", font=NORMAL_FONT)
 words_label.grid(row=1, column=3)
 
+# Text Area
 combo = TextScrollCombo(main_window)
 combo.txt.insert(END, sample_text)
-# text_area.grid(row=1, column=0, columnspan=3)
-combo.grid(row=2, column=0, columnspan=4, pady=5)
-combo.config(width=600, height=200)
+combo.grid(row=2, column=0, columnspan=4, pady=5, padx=15)
+combo.config(width=900, height=200)
 combo.txt.config(font=("consolas", 12), undo=True, wrap='word', state="disable")
 combo.txt.config(borderwidth=3, relief="flat")
-style = ttk.Style()
-style.theme_use('clam')
 
+# Typing Area
 typing_area = TextScrollCombo(main_window)
-typing_area.grid(row=3, column=0, columnspan=4, pady=5)
-typing_area.config(width=600, height=200)
+typing_area.grid(row=3, column=0, columnspan=4, pady=5, padx=15)
+typing_area.config(width=900, height=200)
 typing_area.txt.config(font=("consolas", 12), undo=True, wrap='word')
 typing_area.txt.config(borderwidth=3, relief="flat")
 
-
-timer_label = Label(text="Time Remaining", bg=BACKGROUND_COLOR, font=NORMAL_FONT)
-timer_label.grid(row=4, column=0, columnspan=2)
+# Timer
 duration = 60
-remaining_time = Label(text=f"{duration}", font=NORMAL_FONT)
-remaining_time.grid(row=4, column=2, columnspan=2)
+timer_label = ttk.Label(text=f"Time Remaining: {duration}", font=NORMAL_FONT)
+timer_label.grid(row=4, column=0, columnspan=2)
 
 # ---------------------------- Event Listener ------------------------------- #
 main_window.bind("<KeyPress>", space_listener, add="+")
 main_window.bind("<KeyPress>", start_countdown, add="+")
 main_window.bind("<KeyPress>", char_listener, add="+")
+
 main_window.mainloop()
