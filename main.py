@@ -5,11 +5,10 @@ from tkinter import ttk
 from ttkthemes import ThemedTk
 import os
 from difficulty_dropdown import DifficultDropDown
+from datetime import datetime
 
-# TODO: look into highlighting and following the words
-# TODO: The high score file should keep the history of the user with the date
 # TODO: resolve the issue of having the delete button messing up with the words counter
-# TODO: Restart functionality
+# TODO: resolve the issue of the timer starting automatically after restarting the game
 # ---------------------------- CONSTANTS ------------------------------- #
 BACKGROUND_COLOR = "#B1DDC6"
 TITLE_FONT = ("Arial", 32, "bold")
@@ -19,8 +18,8 @@ NORMAL_FONT = ("Arial", 18, "normal")
 # ---------------------------- FUNCTIONS ------------------------------- #
 
 def start_countdown(event):
-    global duration
     if duration == 60 and len(event.keysym) == 1:
+        print(event.keysym)
         count_down()
 
 
@@ -42,19 +41,25 @@ def count_down():
 def space_listener(event):
     global words_measured
     if event.keysym == "space":
+        typed_text = "" # This line is to ensure a new start after restarting
+        test_list = []  # This line is to ensure a new start after restarting
         words_measured.set(words_measured.get() + 1)
-        text = typing_area.txt.get("1.0", 'end-1c')
-        text_list = text.split()
+        typed_text = typing_area.txt.get("1.0", 'end-1c')
+        typed_text_list = typed_text.split()
         test_list = sample_text.split()
         test_list_sliced = test_list[:words_measured.get()]
+        highlight_word(test_list_sliced[words_measured.get() -1])
+        # print(f"words_measured: {words_measured.get()}")
+        # print(f"typed_text_list: {typed_text_list}")
+        # print(f"test_list_sliced: {test_list_sliced}")
         for i in range(words_measured.get() - 1, words_measured.get()):
-            if text_list[i] == test_list_sliced[i]:
-                print(f"They match {text_list[i]}") # This line is to keep track of how the code is running
+            if typed_text_list[i] == test_list_sliced[i]:
+                print(f"They match {typed_text_list[i]}") # This line is to keep track of how the code is running
                 correct_words_measured.set(correct_words_measured.get() + 1)
                 words_label.config(text=f"{correct_words_measured.get()}: Words / Minute")
             else:
                 # This line is to keep track of how the code is running
-                print(f"They don't match {text_list[i]} and {test_list_sliced[i]}")
+                print(f"They don't match {typed_text_list[i]} and {test_list_sliced[i]}")
 
 
 def char_listener(event):
@@ -67,22 +72,24 @@ def char_listener(event):
         char_measured.set(char_measured.get() - 1)
         char_label.config(text=f"CPM: {char_measured.get()}")
 
+
 def high_score_tracker(operation, new_score=0):  # High score tracker
+    today = datetime.today().strftime('%d-%m-%Y')
     if operation == "read":
         with open("high_score.txt", mode="a+") as file:
             if os.path.getsize('high_score.txt') == 0:
                 initialized_score = 0
-                file.write(f"User's Highest Score: {initialized_score}")
+                file.write(f"{today} User's Highest Score: {initialized_score}\n")
                 return initialized_score
             else:
                 file.seek(0)  # Move the cursor back to the Start of the line
-                data = file.readline()
+                data = file.readlines()[-1]
                 text = data.split()
                 existing_score = int(text[-1])
                 return existing_score
     elif operation == "update":
-        with open("high_score.txt", mode="w") as file:
-            file.write(f"User's Highest Score: {new_score}")
+        with open("high_score.txt", mode="a") as file:
+            file.write(f"{today} User's Highest Score: {new_score}\n")
             return new_score
 
 
@@ -110,6 +117,38 @@ def difficulty_selector(lvl):
     text_area.txt.delete("1.0", "end")
     text_area.txt.insert(END, sample_text)
     text_area.txt.config(state="disable")
+
+
+# Call this function to highlight a specific word (e.g., "your_word_to_highlight")
+def highlight_word(word_to_highlight):
+    # Clear any existing highlighting
+    text_area.txt.tag_delete("highlight")
+
+    # Search for the word and highlight it
+    start = "1.0"
+    while True:
+        start = text_area.txt.search(word_to_highlight, start, stopindex="end")
+        if not start:
+            break
+        end = f"{start}+{len(word_to_highlight)}c"
+        text_area.txt.tag_configure("highlight", background="yellow", foreground="black")
+        text_area.txt.tag_add("highlight", start, end)
+        start = end
+
+
+def restart_window():
+    global char_measured, words_measured, duration, words_measured
+    char_measured.set(0)
+    char_label.config(text=f"CPM: {char_measured.get()}")
+    words_measured.set(0)
+    correct_words_measured.set(0)
+    words_label.config(text=f"{correct_words_measured.get()} : Words / Minute")
+    typing_area.txt.config(state="normal")
+    typing_area.txt.delete("1.0", "end")
+    difficulty_selector(lvl_dropdown.clicked.get())
+    duration = 60
+    timer_label.config(text=f"Time Remaining: {duration}")
+    main_window.bind("<KeyPress>", start_countdown, add="+")
 
 
 
@@ -172,8 +211,11 @@ typing_area.txt.config(borderwidth=3, relief="flat")
 # Timer
 duration = 60
 timer_label = ttk.Label(text=f"Time Remaining: {duration}", font=NORMAL_FONT)
-timer_label.grid(row=4, column=0, columnspan=4)
+timer_label.grid(row=4, column=0, columnspan=3)
 
+# Restart Button
+restart_btn = ttk.Button(text="Restart", command=restart_window)
+restart_btn.grid(row=4, column=3)
 # ---------------------------- Event Listener ------------------------------- #
 main_window.bind("<KeyPress>", space_listener, add="+")
 main_window.bind("<KeyPress>", start_countdown, add="+")
